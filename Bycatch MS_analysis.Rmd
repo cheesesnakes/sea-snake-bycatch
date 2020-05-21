@@ -3,6 +3,14 @@ title: "Fisheries induced shifts in sea snake assemblages along the Konkan coast
 subtitle: "Supplementary materials B: Analysis and Figures"
 author: "Rao, C., Dsouza, S., Gupta, T., Manoharakrishnan, M. and Lobo, A.S."
 output:
+  html_document:
+    code_folding: hide
+    css: style.css
+    df_print: kable
+    number_sections: yes
+    theme: united
+    toc: yes
+    toc_float: yes
   word_document:
     toc: yes
     df_print: kable
@@ -10,8 +18,8 @@ output:
 
 ```{r setup}
 options(max.print="75")
-knitr::opts_chunk$set(echo = T, error = T, warning = F, message = F, tidy = T, cache = T,
-                      dpi = 300, fig.align = "center", eval = F)
+knitr::opts_chunk$set(echo = T, error = F, warning = F, message = F, tidy = T, cache = T,
+                      dpi = 300, fig.align = "center", eval = T)
 
 #Required libraries
 
@@ -463,7 +471,8 @@ mort.grsp <- snakes%>%
            Species == "Hydrophis schistosus")%>% # keeping dominant species
   droplevels()%>%
   select(Gear.Type, Date, Boat.Name, Species, Condition.at.encounter.)%>%
-  rename(Condition = Condition.at.encounter.)
+  rename(Condition = Condition.at.encounter.)%>%
+  mutate(Condition = as.factor(Condition))
   
 ```
 
@@ -539,10 +548,10 @@ CPUE.studies <- snakes%>%
   filter(Species == "Hydrophis curtus" | 
            Species == "Hydrophis schistosus")%>% # keeping dominant species
   droplevels()%>%
-  group_by(Year, Date, Boat.Name...Owner, Species)%>%
+  group_by(Year, Date, Boat.Name, Species)%>%
   summarise(Abn = n(), # abundance of sea snakes per trip
             fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort
-  complete(nesting(Year, Date, Boat.Name...Owner, fe), 
+  complete(nesting(Year, Date, Boat.Name, fe), 
            Species, fill = list(Abn = 0))%>% # completing species x trip combinations
   group_by(Year, Species)%>%
   summarise(Mean.CPUE = mean(Abn/fe, na.rm = T), # Mean CPUE per trip

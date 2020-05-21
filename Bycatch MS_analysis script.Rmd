@@ -1,0 +1,837 @@
+---
+title: "Fisheries induced shifts in sea snake assemblages along the Konkan coast of India"
+subtitle: "Supplementary materials B: Analysis and Figures"
+author: "Rao, C., Dsouza, S., Gupta, T., Manoharakrishnan, M. and Lobo, A.S."
+output:
+  word_document:
+    toc: yes
+    df_print: kable
+---
+
+```{r setup}
+options(max.print="75")
+knitr::opts_chunk$set(echo = T, error = T, warning = F, message = F, tidy = T, cache = T,
+                      dpi = 300, fig.align = "center", eval = F)
+
+#Required libraries
+
+library(plyr)
+library(tidyverse)
+library(lubridate)
+library(RColorBrewer)
+
+#Importing sea snake bycatch data
+
+snakes = read.csv("./Data/Rao et al_data_sea snake bycatch.csv")
+
+
+# Fixing tow duration for 2018 - 2019
+
+snakes <- snakes%>%
+  mutate(Month = factor(months(dmy(Date), abbreviate = T), levels = month.abb))%>%
+  group_by(Year, Gear.Type)%>%
+  mutate(n.hauls = ifelse(is.na(No..of.Hauls), #filling in missing data
+                         mean(No..of.Hauls, na.rm = T), No..of.Hauls),
+         haul.time = ifelse(is.na(Average.Haul.Duration..Hours.), 
+                         mean(Average.Haul.Duration..Hours., na.rm = T),
+                         Average.Haul.Duration..Hours.))%>%
+  ungroup()%>%
+  mutate(Tow.duration.hours = 
+           ifelse(is.na(Tow.duration.hours), # only for TD not recorded
+                    ifelse(Gear.Type == "GillNet", #for gillnets
+                            (haul.time+1.75), #soak time correction
+                           ifelse(Gear.Type == "Trawler", #for trawlers
+                                  n.hauls*haul.time, # total tow duration
+                                  Tow.duration.hours) #return unchanged
+                           ), #return unchanged
+                    Tow.duration.hours)# return same for TD recorded
+         )
+
+#setting ggplot theme
+
+theme_set(theme_bw()+
+            theme(legend.position = "top",
+                  text = element_text(size = 15)
+                  )
+          )
+
+# function calculating mcfadden's pseudo r2 for glms
+
+mcfadden <- function(x){
+  r2 <- 1 - (x$deviance/x$null.deviance)
+}
+
+# function for calculating effect size for Z - test
+
+proptest.r <- function(x, y){
+  r <- x$statistic/sum(y$N)
+}
+
+```
+
+# Composition of sea snakes in bycatch
+
+## Sampling effort
+
+We calculated the number of trips sampled and fishing effort per trip (Tow duration in hours) to determine sampling effort per month of each year of sampling.
+
+```{r}
+#Number of boats sampled accross years
+
+snakes%>%
+  group_by(Year, Month)%>%
+  distinct(Date, Boat.Name, .keep_all = T)%>%
+  #filter(!Boat.Name == "")%>%
+  count(name = "n.trips")%>%
+  spread(Month, n.trips)
+  
+# Fishing effort accross years
+
+snakes%>%
+  group_by(Year, Month)%>%
+  distinct(Date, Boat.Name, .keep_all = T)%>%
+  summarise(sampling.effort = round(sum(Tow.duration.hours, na.rm = T), 2))%>%
+  spread(Month, sampling.effort)
+
+snakes%>%
+  filter(Gear.Type == "Trawler" | Gear.Type == "GillNet")%>%
+  group_by(Gear.Type)%>%
+  distinct(Date, Boat.Name, .keep_all = T)%>%
+  summarise(n.trips = n(),
+            sampling.effort = round(sum(Tow.duration.hours, na.rm = T), 2))
+```
+
+Sampling was not conducted trip wise for 2016 and most of 2017. Hence, effort data is unavailable.
+
+## Assemblage composition
+
+We computed the abundance of each species of snake encountered over the whole sampling duration and across years
+
+```{r}
+snakes%>%
+  group_by(Species, Year)%>%
+  count(name = "Abundance")%>%
+  spread(Year, Abundance)
+```
+
+
+## Varition in catch per unity effort (CPUE) of sea snakes across years in each gear
+
+We considered only the two dominant species for in depth analysis. Catch Per Unit Effort (CPUE) for each species in each sampled trip was calculated as ‘Abundance of snakes encountered over Total Tow Duration or Soak Time’. We tested the effect of Tow duration on CPUE of each species using a log – linear regression. We compared the catch rates (CPUE) of each species across and within gears using log – linear regression. 
+
+```{r}
+CPUE.grsp <- snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  group_by(Year, Gear.Type, Date, Boat.Name, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
+  complete(nesting(Year, Gear.Type, Date, Boat.Name, fe), 
+           Species, fill = list(Abn = 0))%>% # completing species x trip combinations
+  mutate(cpue = Abn/fe)
+
+CPUE.grsp%>%
+  group_by(Gear.Type, Species)%>%
+  summarise(Mean.CPUE = mean(cpue, na.rm = T))%>%
+  spread(Species, Mean.CPUE)
+```
+
+```{r}
+# testing difference in CPUE between trawlers and gillnets
+
+CPUE.grsp%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(cpue ~ Gear.Type, data = ., family = poisson(link = "log"))),
+         sumry = map(mod, broom::tidy),
+         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
+  select(sumry, pseudo.r2)%>%
+  unnest()
+```
+
+```{r}
+# testing difference in CPUE between Species
+
+CPUE.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(cpue ~ Species, data = ., family = poisson())),
+         sumry = map(mod, broom::tidy),
+         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
+  select(sumry, pseudo.r2)%>%
+  unnest()
+```
+
+```{r}
+#Plotting 
+
+snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  group_by(Year, Gear.Type, Date, Boat.Name, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
+  complete(nesting(Year, Gear.Type, Date, Boat.Name, fe), 
+           Species, fill = list(Abn = 0))%>% # completing species x trip combinations
+  group_by(Year, Gear.Type, Species)%>%
+  summarise(CPUE = mean(Abn/fe, na.rm = T), # Mean CPUE per trip
+            sd = sd(Abn/fe, na.rm = T))%>% 
+  ggplot(aes(Year, CPUE, shape = Species, group = Species))+
+  geom_point(size = 3)+
+  geom_line(aes(linetype = Species), size = 1)+
+  scale_x_continuous(breaks = seq(2016, 2018, 1))+
+  labs(y = "Mean CPUE")+
+  facet_wrap(~Gear.Type)+
+  theme(legend.text = element_text(face = "italic"))
+
+ggsave("./Figures/figure 1.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 8)
+```
+
+
+## Seasonal variation in CPUE
+
+We tested for seasonality in bycatch trends for each species in each gear using log – linear regressions with months as predictor variables. 
+
+```{r}
+# testing seasonality in CPUE by gear
+
+CPUE.month <- snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  group_by(Year, Month, Gear.Type, Date, Boat.Name, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
+  complete(nesting(Year, Month, Gear.Type, Date, Boat.Name, fe),  
+           Species, fill = list(Abn = 0))%>% # completing species x trip combinations
+  mutate(CPUE = Abn/fe) # Mean CPUE per trip
+
+            
+CPUE.month%>%
+  ungroup()%>%
+  group_by(Gear.Type, Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(CPUE ~ Month, data = ., family = poisson())),
+         sumry = map(mod, broom::tidy),
+         tst = map(mod, car::Anova))%>%
+  select(sumry)%>%
+  unnest()%>%
+  select(term, estimate)%>%
+  spread(term, estimate, drop = T)
+
+CPUE.month%>%
+  ungroup()%>%
+  group_by(Gear.Type, Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(CPUE ~ Month, data = .)),
+         sumry = map(mod, broom::tidy),
+         tst = map(mod, car::Anova))%>%
+  select(tst)%>%
+  unnest()
+```
+
+```{r}
+#plotting
+
+snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  mutate(Month = factor(Month, levels = month.abb))%>%
+  group_by(Year, Month, Gear.Type, Date, Boat.Name, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
+  complete(nesting(Year, Gear.Type, Date, Boat.Name, fe), Month, 
+           Species, fill = list(Abn = 0))%>% # completing species x trip combinations
+  group_by(Month, Gear.Type, Species)%>%
+  summarise(CPUE = mean(Abn/fe, na.rm = T), # Mean CPUE per trip
+            sd = sd(Abn/fe, na.rm = T))%>%
+  ggplot(aes(Month, CPUE, shape = Species,  group = Species))+
+  geom_point(size = 3)+
+  geom_line(aes(linetype = Species), size = 1)+
+  scale_y_log10()+
+  geom_vline(xintercept = "Jun", size = 1, linetype = "dotted")+
+  geom_vline(xintercept = "Aug", size = 1, linetype = "dotted")+
+  geom_text(aes(x = "Jul", y = 0.3, label = "Monsoon Ban"))+
+  labs(y = "Mean CPUE (log)")+
+  facet_wrap(~Gear.Type, ncol = 1)+
+  theme(legend.text = element_text(face = "italic"))
+
+ggsave("./Figures/figure 2.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 8)
+```
+
+
+
+## Length distribution in bycatch
+
+We determined selectivity of gears with respect to SVL of individuals using a t – test for each species in each gear.
+
+```{r}
+#plotting
+
+snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  ggplot(aes(Snout.to.Vent..cm., fill = Gear.Type))+
+  geom_density(aes(linetype = Gear.Type),alpha = 0.3, size = 1)+
+  labs(x = "Snout to vent length (cm)", y = "Kernel Density")+
+  facet_wrap(~Species)+
+  theme(strip.text = element_text(face = "italic"))
+```
+
+```{r}
+# summary SVL
+
+snakes%>%
+  filter(Species == "Hydrophis curtus" | Species == "Hydrophis schistosus")%>%
+  group_by(Species)%>%
+  skimr::skim(Snout.to.Vent..cm.)%>%
+  skimr::yank("numeric")
+```
+
+
+```{r}
+#Z - test for proportion
+
+snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>%
+  filter(!is.na(Snout.to.Vent..cm.))%>%
+  droplevels()%>%
+  select(Gear.Type, Species, Snout.to.Vent..cm.)%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(t.test = map(data, ~t.test(Snout.to.Vent..cm. ~ Gear.Type, data = .)),
+         sumry = map(t.test, broom::tidy),
+         d = map(data, ~lsr::cohensD(Snout.to.Vent..cm. ~ Gear.Type, data = .)))%>%
+  unnest(sumry, d)%>%
+  select(estimate:p.value, d)
+```
+
+## Sex distibution in bycatch
+
+We determined selectivity in terms of sex individuals using a two sample Z test for the proportion of females caught.
+
+```{r}
+#Plotting
+
+snakes%>%
+  filter(Sex == "Male" | Sex == "Female")%>% # sex recorded
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  ggplot(aes(Species, fill = Sex))+
+  geom_bar(position = "dodge", col = "black", width = 0.25)+
+  scale_fill_brewer(palette = "Greys")+
+  facet_wrap(~Gear.Type)+
+  theme(axis.text.x = element_text(face = "italic"))
+```
+
+```{r}
+# Z - test for proportion
+
+snakes%>%
+  filter(Sex == "Male" | Sex == "Female")%>% # sex recorded
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>%
+  group_by(Gear.Type, Species, Sex)%>%
+  count()%>%
+  spread(Sex, n)%>%
+  mutate(N = Male+Female)%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(prop = map(data, ~prop.test(.$Female, .$N)),
+         sumry = map(prop, broom::tidy),
+         r = map2(prop, data, ~proptest.r(x = .x, y = .y)))%>%
+  unnest(sumry, r)%>%
+  select(estimate1, estimate2, p.value, conf.low, conf.high, r)
+```
+
+Significantly more male _H. curtus_ caught in trawler than gillnets
+
+
+# Effect of effort on composition of sea snakes
+
+We tested the effect of Tow duration on CPUE of each species using a log – linear regression.
+
+```{r}
+#Extracting CPUE data from bycatch database
+
+CPUE = snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(!Boat.Name == "")%>% # removing points with no effort 
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  group_by(Gear.Type, Date, Boat.Name, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
+  complete(nesting(Gear.Type, Date, Boat.Name, fe), 
+           Species, fill = list(Abn = 0))%>%
+  mutate(CPUE = Abn/fe,
+         log.Abn = log(Abn),
+         log.CPUE = log(CPUE),# log CPUE because CPUE is 0 inflated
+          log.fe = log(fe))# fe is 0 inflated
+
+#Sample size
+
+CPUE%>%
+  group_by(Gear.Type)%>%
+  distinct(Date, Boat.Name)%>%
+  count()
+```
+
+```{r}
+#Plot
+
+CPUE%>%
+  ggplot(aes(log.fe, log.CPUE, shape = Species))+
+  geom_jitter(size = 3)+
+  geom_smooth(aes(linetype = Species), method = "lm", col = "black")+
+  scale_color_brewer(palette = "Greys")+
+  labs(y = "CPUE (log)", x = "Fishing Effort (log haul hours)")+
+  facet_wrap(~ Gear.Type, scales = "free_x")+
+  theme(legend.text = element_text(face = "italic"))
+```
+
+```{r}
+# testing 
+
+CPUE%>%
+  group_by(Gear.Type, Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(CPUE ~ fe, data = ., family = poisson())),
+         sumry = map(mod, broom::tidy),
+         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
+  select(sumry, pseudo.r2)%>%
+  unnest()
+```
+
+# Mortality rates of sea snakes in bycatch by gear
+
+We compared risk of mortalities of each species across and within gears using binomial regression with conditions at encounter as the response variable.
+
+```{r}
+#Extracting mortality data from bycatch database
+
+mortality <- snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  group_by(Gear.Type, Species)%>%
+  summarise(n.alive = sum(Condition.at.encounter. == "Alive"),
+            n.dead = sum(Condition.at.encounter. == "Dead"),
+            mort.rate = (n.dead/(n.dead+n.alive))*100)
+
+#table
+
+knitr::kable(mortality)
+```
+
+```{r}
+#Plot
+
+mortality%>%
+  ggplot(aes(Species, mort.rate, fill = Gear.Type))+
+  geom_col(position = "dodge", col = "black", width = 0.25)+
+  scale_fill_brewer(palette = "Greys")+
+  labs(x = "Species", y = "Mortality Rate (%)")+
+  theme(axis.text.x = element_text(face = "italic"))
+
+ggsave("./Figures/figure 3.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 4.5)
+```
+
+
+```{r}
+#extracting mortality per trip from bycatch database
+
+mort.grsp <- snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  select(Gear.Type, Date, Boat.Name, Species, Condition.at.encounter.)%>%
+  rename(Condition = Condition.at.encounter.)
+  
+```
+
+```{r}
+# testing difference in mortality between trawlers and gillnets
+
+mort.grsp%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(Condition ~ Gear.Type, data = ., family = binomial())),
+         sumry = map(mod, broom::tidy),
+         stat = map(mod, ~mcfadden(.)))%>%
+  select(sumry, stat)%>%
+  unnest()
+```
+
+```{r}
+# testing difference in CPUE between Species
+
+mort.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(Condition ~ Species, data = ., family = binomial())),
+         sumry = map(mod, broom::tidy),
+         stat = map(mod, ~mcfadden(.)))%>%
+  select(sumry, stat)%>%
+  unnest()
+```
+
+# Change in sea snake assemblages
+
+Data on abundance of _H. curtus_ and _H. schistosus_, overall sampling effort, number of trips was gathered from secondary published; Lobo (2004) and Padate et al (2009). A summary of the number of trips sampled and the sampling effort for each study in Table 2 of supplementary materials A. We used data from trawler bycatch alone to maintain consistency in our comparisons. 
+
+```{r}
+#importing data for past studies
+
+past_studies <- read.csv("./Data/Rao et al_data_Past Studies.csv")
+
+past_studies$Study <- past_studies$ï..Study
+```
+
+## Sampling effort accross years
+
+```{r}
+#summarising data from current study
+
+effort.studies <- snakes%>%
+  filter(Gear.Type == "Trawler")%>%
+  group_by(Year)%>%
+  distinct(Date, Boat.Name, .keep_all = T)%>%
+  summarise(N.trips = n(),
+            Total.fe = sum(Tow.duration.hours, na.rm = T))
+
+#attching to previous studies
+
+effort.studies <-  past_studies%>%
+  select(Year, N.trips, Total.fe)%>%
+  distinct(Year, .keep_all = T)%>%
+  bind_rows(effort.studies)
+
+#table
+
+knitr::kable(effort.studies)
+```
+
+## Assemblage composition accross studies
+
+We compared the relative abundance of H. curtus and mortality rates (proportion of individuals encountered dead) across studies using Z-Tests of proportion.
+
+```{r}
+CPUE.studies <- snakes%>%
+  filter(Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  droplevels()%>%
+  group_by(Year, Date, Boat.Name...Owner, Species)%>%
+  summarise(Abn = n(), # abundance of sea snakes per trip
+            fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort
+  complete(nesting(Year, Date, Boat.Name...Owner, fe), 
+           Species, fill = list(Abn = 0))%>% # completing species x trip combinations
+  group_by(Year, Species)%>%
+  summarise(Mean.CPUE = mean(Abn/fe, na.rm = T), # Mean CPUE per trip
+            sd = sd(Abn/fe, na.rm = T),
+            Total.Abn = sum(Abn, na.rm = T),
+            Total.fe = sum(fe, na.rm = T))
+
+CPUE.studies <- past_studies%>%
+  select(Year, Species, Mean.CPUE, sd, Total.Abn, Total.fe)%>%
+  bind_rows(CPUE.studies)
+
+```
+
+```{r}
+#Plotting
+
+assemblage <- CPUE.studies%>%
+  group_by(Year)%>%
+  mutate(Total = sum(Total.Abn))%>%
+  group_by(Year, Species)%>%
+  summarise(rel.prop = Total.Abn/Total)%>%
+  ggplot(aes(Year, rel.prop))+
+  geom_point(aes(shape = Species), size = 3)+
+  geom_line(aes(linetype = Species, group = Species), size = 1)+
+  labs(y = "Relative Aundance in byactch")+
+  theme(axis.text.x = element_blank())+
+  theme(legend.text = element_text(face = "italic"),
+        axis.title.x = element_blank())
+
+# adding study periods to plot
+
+study_periods <- read.csv("./Data/Rao et al_data_study_periods.csv")
+
+study_periods$study <- study_periods$ï..study
+
+# rectangle plot
+period1 <-  ggplot(study_periods)+
+  geom_rect(aes(xmin = start.year, xmax = end.year, ymax = 1, ymin = -1,
+                fill = study),  col = "black", 
+                 size = 0.1, height = 0.1)+
+  geom_text(aes(x = median.year, y = 0, label = study), size = 3)+
+  scale_fill_brewer(palette = "Greys", guide = F)+
+  #scale_y_continuous(limits = c(0.5, 1.3))+
+  labs(x = "Year")+
+  theme_void()+
+  theme(text = element_text(size = 15),
+        axis.title.x = element_text(size = 15))
+
+# arrow plot
+period <-  ggplot(study_periods)+
+  geom_errorbarh(aes(xmin = start.year, xmax = end.year, y = 1.75), 
+                 size = 1)+
+  geom_text(aes(x = median.year, y = 0.75, label = study), size = 3.5)+
+  scale_y_continuous(limits = c(0, 2.25))+
+  labs(x = "Year")+
+  theme_void()+
+  theme(text = element_text(size =15),
+        axis.title.x = element_text(size = 15),
+        axis.text.x = element_text())
+
+# final plot
+ggpubr::ggarrange(assemblage, period, 
+                  ncol = 1, 
+                  heights = c(1, 0.2),
+                  align = "v")
+
+ggsave("./Figures/figure 4.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 8)
+
+```
+
+```{r}
+#Z - test for proportion
+
+CPUE.studies%>%
+  group_by(Year)%>%
+  mutate(N = sum(Total.Abn))%>%
+  filter(Species == "Hydrophis curtus")%>%
+  ungroup()%>%
+  nest()%>%
+  mutate(proptest = map(data, ~prop.test(.$Total.Abn, .$N)),
+         sumry = map(proptest, broom::tidy),
+         r = map2(proptest, data, ~proptest.r(.x, .y)))%>%
+  select(sumry,r)%>%
+  unnest()%>%
+  select(estimate1:p.value, r)
+```
+
+## Difference in mortality of sea snakes in Trawlers across studies
+
+```{r}
+#summarising data from current study
+
+mortality.studies <- snakes%>%
+  filter(Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  group_by(Year, Species)%>%
+  summarise(n.alive = sum(Condition.at.encounter. == "Alive"),
+            n.dead = sum(Condition.at.encounter. == "Dead"),
+            mort.rate = (n.dead/(n.dead+n.alive)),
+            Study = "Current")
+
+# Attaching to previous study data
+
+mortality.studies <- past_studies%>%
+  select(Study, Year, Species, n.alive, n.dead, mort.rate)%>%
+  bind_rows(mortality.studies)%>%
+  mutate(N = n.alive + n.dead)%>%
+  mutate(Study = factor(Study, levels = c("Lobo (2004)", "Padate et al. (2009)", "Current")))%>%
+  group_by(Study, Species)%>%
+  summarise(n.dead = sum(n.dead),
+            N = sum(N),
+            mort.rate = n.dead/N)
+  
+#table
+
+knitr::kable(mortality.studies)
+```
+
+
+```{r}
+#plot
+
+mortality.studies%>%
+  ggplot(aes(Study, mort.rate, fill = Species))+
+  geom_col(position = position_dodge(preserve = "single"), col = "black", width = 0.25)+
+  scale_fill_brewer(palette = "Greys")+
+  labs(x = "Year", y = "Mortality Rate (%)")+
+  theme(legend.text = element_text(face = "italic"))
+```
+
+
+```{r}
+# test
+
+mortality.studies%>%
+  group_by(Species)%>%
+  drop_na()%>%
+  nest()%>%
+  mutate(proptest = map(data, ~prop.test(.$n.dead, .$N)),
+         #mod = map(data, ~lm(rel.prop ~ Year, data = .)),
+         sumry = map(proptest, broom::tidy),
+         r = map2(proptest, data, ~proptest.r(.x, .y)))%>%
+  select(sumry,r)%>%
+  unnest()%>%
+  select(estimate1:p.value, r)
+```
+
+
+# Increase in fishing pressure in Konkan 2000 - 2020
+
+In order to understand the change in fishing pressure in the region we gathered data on the number of vessels of each craft type (mechanised, motorised and non- motorised) for Maharashtra and Goa from CMFRI Marine Fisheries Census for 2005 and 2010; Fisheries Department for 2014, 2015, 2017 and 2018; Jena and George (2018) for 2016 and the Handbook on Fisheries Statistics for 2019. The CMFRI Marine Fisheries Census recorded all vessels across multiple harbours across each state. The other sources reported on registered vessels only. Change in the number of vessels of each craft type from 2005 to 2019 were tested using log – linear regression. We compared the number of vessels of each craft across Maharashtra and goa using a t – test.
+
+```{r}
+#importing data on number of vessels
+
+vessels <- read.csv("./Data/Rao et al_data_state-craft-gear.csv")
+
+vessels$Year <- vessels$ï..Year
+```
+
+```{r}
+#plot
+
+vessels%>%
+  ggplot(aes(Year, n, shape = Craft))+
+  geom_point(size = 3)+
+  geom_line(aes(group = Craft, linetype = Craft), size = 1)+
+  scale_y_sqrt()+
+  labs(y = "No. of Vessels (sq. rt.)")+
+  facet_wrap(~ State, ncol = 1)
+
+ggsave("./Figures/figure 5.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 6, width = 8)
+
+```
+
+```{r}
+
+#testing change in number of vessels over years
+
+vessels%>%
+  group_by(State, Craft)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(n ~ Year, data = ., family = poisson())),
+         sumry = map(mod, broom::tidy),
+         r2 = map(mod, ~mcfadden(.)))%>%
+  select(sumry, r2)%>%
+  unnest()%>%
+  arrange(desc(r2))
+```
+
+```{r}
+
+#testing difference in number of vessels between Mah and Goa
+
+vessels%>%
+  group_by(Craft)%>%
+  nest()%>%
+  mutate(mod = map(data, ~t.test(n ~ State, data = .)),
+         sumry = map(mod, broom::tidy),
+         d = map(data, ~lsr::cohensD(n ~ State, data = .)))%>%
+  select(sumry, d)%>%
+  unnest()%>%
+  arrange(desc(d))%>%
+  select(estimate:p.value, d)
+```
+
+# Study site map
+
+```{r}
+library(tmap)
+library(osmdata)
+
+study_sites <- read.csv("./data/Rao et al_data_study_site.csv")
+
+# geocoding study sites
+
+library(ggmap)
+
+study_sites <- study_sites%>%
+  mutate(Name = as.character(Name))%>%
+  mutate_geocode(Name)
+
+knitr::kable(study_sites)
+```
+
+
+```{r}
+# converting to simplfe feature
+
+library(sf)
+
+study_sites <- st_as_sf(study_sites, coords = c("lon", "lat"))
+
+st_crs(study_sites) <- 4326
+
+# getting study extent
+
+study_ext <- st_bbox(study_sites)
+
+# getting osm map
+
+library(osmdata)
+
+land_raw <- opq(bbox = study_ext)%>%
+  add_osm_feature(key = 'admin_level', value = '4')%>%
+  osmdata_sf()%>%
+  unique_osmdata()
+  
+land <- land_raw$osm_multipolygons
+
+st_crs(land) <- 4326
+
+# plotting site map
+
+ss_main <- tm_shape(land)+
+  tm_polygons()+
+  tm_text("name", remove.overlap = F)+
+tm_shape(study_sites, , bbox = study_ext+c(-0.5,-.5,0.5,0.5), is.master = T)+
+  tm_symbols(size = 1, shape = "Study", border.lwd = 2.5, border.col = "black", col = "gray")+
+  tm_text("Name", size = 0.7,fontface = "bold",
+          ymod = -0.7, xmod = -0.75, remove.overlap = T)+
+  tm_graticules(n.x = 5)+
+  tm_scale_bar(position = c("left", "top"), text.size = 0.5) + 
+  tm_compass(position = c('right', 'top'), size = 5)+
+  tm_style(style = "gray")+
+  tm_layout(scale = 1.5, legend.position = c("left", "bottom"))
+
+# making inset map
+
+india <- read_sf("./Data/India-States.shp")
+
+ext <- st_as_sfc(study_ext+c(-1.2,-1.2,1.2,1.2))
+
+ss_inset <- tm_shape(india)+
+  tm_polygons()+
+tm_shape(ext)+
+  tm_borders(lwd = 3)+
+  tm_style("gray")+
+  tm_layout(scale = 1.5)
+
+# making final map
+
+vp <- grid::viewport(x = 0.8, y = 0.175, width = 0.2, height = 0.3)
+
+tmap_save(ss_main, insets_tm = ss_inset, insets_vp = vp, 
+          "./Figures/Figure_1.tiff", height = 8, width = 8)
+
+```
+

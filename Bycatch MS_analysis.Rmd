@@ -16,7 +16,12 @@ output:
 ```{r setup, message = F}
 
 options(max.print="75")
+<<<<<<< HEAD
 knitr::opts_chunk$set(echo = T, error = T, warning = F, message = F, tidy = T, cache = T,
+=======
+
+knitr::opts_chunk$set(echo = T, error = F, warning = F, message = F, tidy = T, cache = T,
+>>>>>>> 27be2308eb7ba4cca676770bc5fd1b11b17b1a31
                       dpi = 300, fig.align = "center", eval = T)
 
 #Required libraries
@@ -795,7 +800,7 @@ study_ext <- st_bbox(study_sites)
 
 library(osmdata)
 
-land_raw <- opq(bbox = study_ext)%>%
+land_raw <- opq(bbox = study_ext, timeout = 100)%>%
   add_osm_feature(key = 'admin_level', value = '4')%>%
   osmdata_sf()%>%
   unique_osmdata()
@@ -809,7 +814,7 @@ st_crs(land) <- 4326
 ss_main <- tm_shape(land)+
   tm_polygons()+
   tm_text("name", remove.overlap = F)+
-tm_shape(study_sites, , bbox = study_ext+c(-0.5,-.5,0.5,0.5), is.master = T)+
+tm_shape(study_sites, bbox = study_ext+c(-0.5,-.5,0.5,0.5), is.master = T)+
   tm_symbols(size = 1, shape = "Study", border.lwd = 2.5, border.col = "black", col = "gray")+
   tm_text("Name", size = 0.7,fontface = "bold",
           ymod = -0.7, xmod = -0.75, remove.overlap = T)+

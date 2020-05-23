@@ -11,22 +11,19 @@ output:
     theme: united
     toc: yes
     toc_float: yes
-  word_document:
-    toc: yes
-    df_print: kable
 ---
 
-```{r setup}
+```{r setup, message = F}
+
 options(max.print="75")
-knitr::opts_chunk$set(echo = T, error = F, warning = F, message = F, tidy = T, cache = T,
+knitr::opts_chunk$set(echo = T, error = T, warning = F, message = F, tidy = T, cache = T,
                       dpi = 300, fig.align = "center", eval = T)
 
 #Required libraries
-
-library(plyr)
-library(tidyverse)
-library(lubridate)
-library(RColorBrewer)
+suppressPackageStartupMessages(library(plyr))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(RColorBrewer))
 
 #Importing sea snake bycatch data
 

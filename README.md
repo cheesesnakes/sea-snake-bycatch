@@ -189,4 +189,4 @@ The effects of intensive fishing on marine fauna has been a subject of global co
  
  © Shawn Dsouza, Dakshin Foundation
  
-Liscensed under [MIT Liscence](LISCENCE)
+Liscensed under [MIT Licence](LICENCE)

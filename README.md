@@ -32,12 +32,8 @@ The effects of intensive fishing on marine fauna has been a subject of global co
  <details>
   <summary>Go through the analysis</summary>
   
-   - The sections of the analysis have been split into seperate R markdown files and can be run independently. 
-    
    - R markdown files are best viewed in the R studio IDE.
     
-   - Some of the analysis refer to custom functions that are included in the `Functions` folder.
-   
    - The repo can be cloned to your github or downloaded
    
    - Before working with the file locally a portable local environment can be activated to make sure you have all the dependencies by running the code below:

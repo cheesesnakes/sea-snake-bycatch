@@ -89,15 +89,22 @@ snakes%>%
   #filter(!Boat.Name == "")%>%
   count(name = "n.trips")%>%
   spread(Month, n.trips)
-  
+```
+
+
+```{r}
 # Fishing effort accross years
 
 snakes%>%
-  group_by(Year, Month)%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  group_by(Gear.Type, Year, Month)%>%
   distinct(Date, Boat.Name, .keep_all = T)%>%
   summarise(sampling.effort = round(sum(Tow.duration.hours, na.rm = T), 2))%>%
-  spread(Month, sampling.effort)
+  spread(Month, sampling.effort, fill = c(0))
+```
 
+
+```{r}
 snakes%>%
   filter(Gear.Type == "Trawler" | Gear.Type == "GillNet")%>%
   group_by(Gear.Type)%>%
@@ -456,6 +463,39 @@ mortality%>%
 
 ggsave("./Figures/figure 3.tiff", device = "tiff", last_plot(), dpi = "print", 
        height = 4.5, width = 4.5)
+```
+
+```{r}
+# monthly mortalities
+
+mortality.month <- snakes%>%
+  filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
+  filter(Species == "Hydrophis curtus" | 
+           Species == "Hydrophis schistosus")%>% # keeping dominant species
+  group_by(Month,Gear.Type, Species)%>%
+  summarise(n.alive = sum(Condition.at.encounter. == "Alive"),
+            n.dead = sum(Condition.at.encounter. == "Dead"),
+            mort.rate = (n.dead/(n.dead+n.alive))*100)%>%
+  ungroup()%>%
+  mutate(Month = factor(Month, levels = month.abb))%>%
+  complete(nesting(Gear.Type), Month, 
+           Species, fill = list(mort.rate = 0)) # completing species x trip combinations
+  
+mortality.month%>%
+  mutate(Month = factor(Month, levels = month.abb))%>%
+  ggplot(aes(Month, mort.rate, shape = Species,  group = Species))+
+  geom_point(size = 3)+
+  geom_line(aes(linetype = Species), size = 1)+
+  geom_vline(xintercept = "Jun", size = 1, linetype = "dotted")+
+  geom_vline(xintercept = "Aug", size = 1, linetype = "dotted")+
+  geom_text(aes(x = "Jul", y = 50, label = "Monsoon Ban"))+
+  labs(y = "Mean CPUE (log)")+
+  facet_wrap(~Gear.Type, ncol = 1)+
+  theme(legend.text = element_text(face = "italic"))
+
+ggsave("./Figures/figure 3b.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 4.5)
+
 ```
 
 

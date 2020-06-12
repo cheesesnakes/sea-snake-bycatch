@@ -621,6 +621,25 @@ ggsave("./Figures/figure 4.tiff", device = "tiff", last_plot(), dpi = "print",
 ```
 
 ```{r}
+# bar chart
+
+CPUE.studies%>%
+  mutate(Year = as.factor(Year))%>%
+  group_by(Year)%>%
+  mutate(Total = sum(Total.Abn))%>%
+  group_by(Year, Species)%>%
+  summarise(rel.prop = Total.Abn/Total)%>%
+  ggplot(aes(Year, rel.prop))+
+  geom_col(aes(fill = Species), col = "black", width = 0.5)+
+  scale_fill_brewer(palette = "Greys")+
+  labs(y = "Relative Aundance in byactch")+
+  theme(legend.text = element_text(face = "italic"))
+
+ggsave("./Figures/figure 4b.tiff", device = "tiff", last_plot(), dpi = "print", 
+       height = 4.5, width = 8)
+```
+
+```{r}
 #Z - test for proportion
 
 CPUE.studies%>%
@@ -837,7 +856,7 @@ tm_shape(ext)+
 
 # making final map
 
-vp <- grid::viewport(x = 0.7, y = 0.15, width = 0.2, height = 0.3)
+vp <- grid::viewport(x = 0.75, y = 0.15, width = 0.2, height = 0.3)
 
 tmap_save(ss_main, insets_tm = ss_inset, insets_vp = vp, 
           "./Figures/Figure_1.tiff", height = 8, width = 8)

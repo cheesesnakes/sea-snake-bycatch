@@ -489,12 +489,12 @@ mortality.month%>%
   geom_vline(xintercept = "Jun", size = 1, linetype = "dotted")+
   geom_vline(xintercept = "Aug", size = 1, linetype = "dotted")+
   geom_text(aes(x = "Jul", y = 50, label = "Monsoon Ban"))+
-  labs(y = "Mean CPUE (log)")+
+  labs(y = "Mortality Rate (%)")+
   facet_wrap(~Gear.Type, ncol = 1)+
   theme(legend.text = element_text(face = "italic"))
 
 ggsave("./Figures/figure 3b.tiff", device = "tiff", last_plot(), dpi = "print", 
-       height = 4.5, width = 4.5)
+       height = 4.5, width = 8)
 
 ```
 

@@ -16,12 +16,7 @@ output:
 ```{r setup, message = F}
 
 options(max.print="75")
-<<<<<<< HEAD
 knitr::opts_chunk$set(echo = T, error = T, warning = F, message = F, tidy = T, cache = T,
-=======
-
-knitr::opts_chunk$set(echo = T, error = F, warning = F, message = F, tidy = T, cache = T,
->>>>>>> 27be2308eb7ba4cca676770bc5fd1b11b17b1a31
                       dpi = 300, fig.align = "center", eval = T)
 
 #Required libraries
@@ -776,6 +771,7 @@ study_sites <- read.csv("./data/Rao et al_data_study_site.csv")
 library(ggmap)
 
 study_sites <- study_sites%>%
+  filter(Study != "2006-2008")%>%
   mutate(Name = as.character(Name))%>%
   mutate_geocode(Name)
 
@@ -809,11 +805,15 @@ land <- land_raw$osm_multipolygons
 
 st_crs(land) <- 4326
 
+india <- read_sf("./Data/India-States.shp")
+
 # plotting site map
 
 ss_main <- tm_shape(land)+
   tm_polygons()+
   tm_text("name", remove.overlap = F)+
+  tm_shape(india)+
+  tm_polygons()+
 tm_shape(study_sites, bbox = study_ext+c(-0.5,-.5,0.5,0.5), is.master = T)+
   tm_symbols(size = 1, shape = "Study", border.lwd = 2.5, border.col = "black", col = "gray")+
   tm_text("Name", size = 0.7,fontface = "bold",
@@ -826,8 +826,6 @@ tm_shape(study_sites, bbox = study_ext+c(-0.5,-.5,0.5,0.5), is.master = T)+
 
 # making inset map
 
-india <- read_sf("./Data/India-States.shp")
-
 ext <- st_as_sfc(study_ext+c(-1.2,-1.2,1.2,1.2))
 
 ss_inset <- tm_shape(india)+
@@ -839,10 +837,9 @@ tm_shape(ext)+
 
 # making final map
 
-vp <- grid::viewport(x = 0.8, y = 0.175, width = 0.2, height = 0.3)
+vp <- grid::viewport(x = 0.7, y = 0.15, width = 0.2, height = 0.3)
 
 tmap_save(ss_main, insets_tm = ss_inset, insets_vp = vp, 
           "./Figures/Figure_1.tiff", height = 8, width = 8)
-
 ```
 

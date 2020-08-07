@@ -144,12 +144,23 @@ CPUE.grsp <- snakes%>%
             fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
   complete(nesting(Year, Gear.Type, Date, Boat.Name, fe), 
            Species, fill = list(Abn = 0))%>% # completing species x trip combinations
-  mutate(cpue = Abn/fe)
+  mutate(cpue = Abn/fe)%>%
+  group_by(Boat.Name)%>%
+  mutate(n = n())%>%
+  ungroup()
 
 CPUE.grsp%>%
   group_by(Gear.Type, Species)%>%
   summarise(Mean.CPUE = mean(cpue, na.rm = T))%>%
   spread(Species, Mean.CPUE)
+
+CPUE.grsp%>%
+  group_by(Gear.Type,Species)%>%
+  nest()%>%
+  mutate(shapiro = map(data, ~shapiro.test(.$cpue)),
+         sumry = map(shapiro, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
 ```
 
 ```{r}
@@ -160,8 +171,17 @@ library(lme4)
 CPUE.grsp%>%
   group_by(Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glmer(cpue ~ Gear.Type + (1|Boat.Name), data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(cpue ~ Gear.Type + (1|Boat.Name), data = .)),
          sumry = map(mod, broom.mixed::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
+CPUE.grsp%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Gear.Type + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
   select(sumry)%>%
   unnest()
 ```
@@ -172,10 +192,20 @@ CPUE.grsp%>%
 CPUE.grsp%>%
   group_by(Gear.Type)%>%
   nest()%>%
-  mutate(mod = map(data, ~glmer(cpue ~ Species + (1|Boat.Name), data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(cpue ~ Species + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy))%>%
   select(sumry)%>%
   unnest()
+
+CPUE.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Species + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
 ```
 
 ```{r}
@@ -231,7 +261,7 @@ CPUE.month%>%
   ungroup()%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glmer(CPUE ~ Month + (1|Boat.Name), data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(CPUE ~ Month + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy),
          tst = map(mod, car::Anova))%>%
   select(sumry)%>%
@@ -243,7 +273,7 @@ CPUE.month%>%
   ungroup()%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glmer(CPUE ~ Month + (1|Boat.Name), data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(CPUE ~ Month + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy),
          tst = map(mod, car::Anova))%>%
   select(tst)%>%
@@ -425,10 +455,20 @@ CPUE%>%
 CPUE%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glmer(CPUE ~ fe + (1|Boat.Name), data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(CPUE ~ fe + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy))%>%
   select(sumry)%>%
   unnest()
+
+CPUE%>%
+  group_by(Gear.Type, Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(CPUE ~ fe + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
 ```
 
 # Mortality rates of sea snakes in bycatch by gear
@@ -534,6 +574,19 @@ mort.grsp%>%
   group_by(Gear.Type)%>%
   nest()%>%
   mutate(mod = map(data, ~glm(Condition ~ Species, data = ., family = binomial())),
+         sumry = map(mod, broom::tidy),
+         stat = map(mod, ~mcfadden(.)))%>%
+  select(sumry, stat)%>%
+  unnest()
+```
+
+```{r}
+# testing difference in CPUE between Species
+
+mort.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(Condition ~ fe, data = ., family = binomial())),
          sumry = map(mod, broom::tidy),
          stat = map(mod, ~mcfadden(.)))%>%
   select(sumry, stat)%>%

@@ -232,8 +232,6 @@ snakes%>%
   facet_wrap(~Gear.Type)+
   theme(legend.text = element_text(face = "italic"))
 
-ggsave("./Figures/figure 1.tiff", device = "tiff", last_plot(), dpi = "print", 
-       height = 4.5, width = 8)
 ```
 
 
@@ -307,9 +305,6 @@ snakes%>%
   labs(y = "Mean CPUE (log)")+
   facet_wrap(~Gear.Type, ncol = 1)+
   theme(legend.text = element_text(face = "italic"))
-
-ggsave("./Figures/figure 2.tiff", device = "tiff", last_plot(), dpi = "print", 
-       height = 4.5, width = 8)
 ```
 
 

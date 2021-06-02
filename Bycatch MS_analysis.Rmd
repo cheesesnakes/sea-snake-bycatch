@@ -167,6 +167,7 @@ CPUE.grsp%>%
 # testing difference in CPUE between trawlers and gillnets
 
 library(lme4)
+library(broom.mixed)
 
 CPUE.grsp%>%
   group_by(Species)%>%
@@ -484,7 +485,7 @@ mortality <- snakes%>%
 
 #table
 
-knitr::kable(mortality)
+mortality
 ```
 
 ```{r}
@@ -575,18 +576,6 @@ mort.grsp%>%
   unnest()
 ```
 
-```{r}
-# testing difference in CPUE between Species
-
-mort.grsp%>%
-  group_by(Gear.Type)%>%
-  nest()%>%
-  mutate(mod = map(data, ~glm(Condition ~ fe, data = ., family = binomial())),
-         sumry = map(mod, broom::tidy),
-         stat = map(mod, ~mcfadden(.)))%>%
-  select(sumry, stat)%>%
-  unnest()
-```
 
 # Change in sea snake assemblages
 
@@ -596,8 +585,6 @@ Data on abundance of _H. curtus_ and _H. schistosus_, overall sampling effort, n
 #importing data for past studies
 
 past_studies <- read.csv("./Data/Rao et al_data_Past Studies.csv")
-
-past_studies$Study <- past_studies$ï..Study
 ```
 
 ## Sampling effort accross years
@@ -621,7 +608,7 @@ effort.studies <-  past_studies%>%
 
 #table
 
-knitr::kable(effort.studies)
+effort.studies
 ```
 
 ## Assemblage composition accross studies
@@ -671,8 +658,6 @@ assemblage <- CPUE.studies%>%
 
 study_periods <- read.csv("./Data/Rao et al_data_study_periods.csv")
 
-study_periods$study <- study_periods$ï..study
-
 # rectangle plot
 period1 <-  ggplot(study_periods)+
   geom_rect(aes(xmin = start.year, xmax = end.year, ymax = 1, ymin = -1,
@@ -699,6 +684,8 @@ period <-  ggplot(study_periods)+
         axis.text.x = element_text())
 
 # final plot
+library(ggpubr)
+
 ggpubr::ggarrange(assemblage, period, 
                   ncol = 1, 
                   heights = c(1, 0.2),
@@ -774,7 +761,7 @@ mortality.studies <- past_studies%>%
   
 #table
 
-knitr::kable(mortality.studies)
+mortality.studies
 ```
 
 
@@ -815,8 +802,6 @@ In order to understand the change in fishing pressure in the region we gathered 
 #importing data on number of vessels
 
 vessels <- read.csv("./Data/Rao et al_data_state-craft-gear.csv")
-
-vessels$Year <- vessels$ï..Year
 ```
 
 ```{r}
@@ -872,7 +857,7 @@ vessels%>%
 library(tmap)
 library(osmdata)
 
-study_sites <- read.csv("./data/Rao et al_data_study_site.csv")
+study_sites <- read.csv("./Data/Rao et al_data_study_site.csv")
 
 # geocoding study sites
 
@@ -883,7 +868,7 @@ study_sites <- study_sites%>%
   mutate(Name = as.character(Name))%>%
   mutate_geocode(Name)
 
-knitr::kable(study_sites)
+study_sites
 ```
 
 

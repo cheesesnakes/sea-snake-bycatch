@@ -110,7 +110,8 @@ snakes%>%
   group_by(Gear.Type)%>%
   distinct(Date, Boat.Name, .keep_all = T)%>%
   summarise(n.trips = n(),
-            sampling.effort = round(sum(Tow.duration.hours, na.rm = T), 2))
+            sampling.effort = round(sum(Tow.duration.hours, na.rm = T), 2),
+            n.boats = length(unique(Boat.Name)))
 ```
 
 Sampling was not conducted trip wise for 2016 and most of 2017. Hence, effort data is unavailable.
@@ -135,31 +136,53 @@ We considered only the two dominant species for in depth analysis. Catch Per Uni
 CPUE.grsp <- snakes%>%
   filter(Gear.Type == "GillNet" | Gear.Type == "Trawler")%>%
   filter(Species == "Hydrophis curtus" | 
-           Species == "Hydrophis schistosus")%>% # keeping dominant species
+           Species == "Hydrophis schistosus",
+         Boat.Name != "")%>% # keeping dominant species
   droplevels()%>%
   group_by(Year, Gear.Type, Date, Boat.Name, Species)%>%
   summarise(Abn = n(), # abundance of sea snakes per trip
             fe = mean(Tow.duration.hours, na.rm = T))%>% # fishing effort, mean for 2016 - 17
   complete(nesting(Year, Gear.Type, Date, Boat.Name, fe), 
            Species, fill = list(Abn = 0))%>% # completing species x trip combinations
-  mutate(cpue = Abn/fe)
+  mutate(cpue = Abn/fe)%>%
+  group_by(Boat.Name)%>%
+  mutate(n = n())%>%
+  ungroup()
 
 CPUE.grsp%>%
   group_by(Gear.Type, Species)%>%
   summarise(Mean.CPUE = mean(cpue, na.rm = T))%>%
   spread(Species, Mean.CPUE)
+
+CPUE.grsp%>%
+  group_by(Gear.Type,Species)%>%
+  nest()%>%
+  mutate(shapiro = map(data, ~shapiro.test(.$cpue)),
+         sumry = map(shapiro, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
 ```
 
 ```{r}
 # testing difference in CPUE between trawlers and gillnets
 
+library(lme4)
+
 CPUE.grsp%>%
   group_by(Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glm(cpue ~ Gear.Type, data = ., family = poisson(link = "log"))),
-         sumry = map(mod, broom::tidy),
-         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
-  select(sumry, pseudo.r2)%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Gear.Type + (1|Boat.Name), data = .)),
+         sumry = map(mod, broom.mixed::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
+CPUE.grsp%>%
+  group_by(Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Gear.Type + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
+  select(sumry)%>%
   unnest()
 ```
 
@@ -169,11 +192,20 @@ CPUE.grsp%>%
 CPUE.grsp%>%
   group_by(Gear.Type)%>%
   nest()%>%
-  mutate(mod = map(data, ~glm(cpue ~ Species, data = ., family = poisson())),
-         sumry = map(mod, broom::tidy),
-         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
-  select(sumry, pseudo.r2)%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Species + (1|Boat.Name), data = .)),
+         sumry = map(mod, broom::tidy))%>%
+  select(sumry)%>%
   unnest()
+
+CPUE.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(cpue ~ Species + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
 ```
 
 ```{r}
@@ -200,8 +232,6 @@ snakes%>%
   facet_wrap(~Gear.Type)+
   theme(legend.text = element_text(face = "italic"))
 
-ggsave("./Figures/figure 1.tiff", device = "tiff", last_plot(), dpi = "print", 
-       height = 4.5, width = 8)
 ```
 
 
@@ -229,7 +259,7 @@ CPUE.month%>%
   ungroup()%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glm(CPUE ~ Month, data = ., family = poisson())),
+  mutate(mod = map(data, ~lmer(CPUE ~ Month + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy),
          tst = map(mod, car::Anova))%>%
   select(sumry)%>%
@@ -241,7 +271,7 @@ CPUE.month%>%
   ungroup()%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glm(CPUE ~ Month, data = .)),
+  mutate(mod = map(data, ~lmer(CPUE ~ Month + (1|Boat.Name), data = .)),
          sumry = map(mod, broom::tidy),
          tst = map(mod, car::Anova))%>%
   select(tst)%>%
@@ -275,9 +305,6 @@ snakes%>%
   labs(y = "Mean CPUE (log)")+
   facet_wrap(~Gear.Type, ncol = 1)+
   theme(legend.text = element_text(face = "italic"))
-
-ggsave("./Figures/figure 2.tiff", device = "tiff", last_plot(), dpi = "print", 
-       height = 4.5, width = 8)
 ```
 
 
@@ -423,11 +450,20 @@ CPUE%>%
 CPUE%>%
   group_by(Gear.Type, Species)%>%
   nest()%>%
-  mutate(mod = map(data, ~glm(CPUE ~ fe, data = ., family = poisson())),
-         sumry = map(mod, broom::tidy),
-         pseudo.r2 = map(mod, ~mcfadden(.)))%>%
-  select(sumry, pseudo.r2)%>%
+  mutate(mod = map(data, ~lmer(CPUE ~ fe + (1|Boat.Name), data = .)),
+         sumry = map(mod, broom::tidy))%>%
+  select(sumry)%>%
   unnest()
+
+CPUE%>%
+  group_by(Gear.Type, Species)%>%
+  nest()%>%
+  mutate(mod = map(data, ~lmer(CPUE ~ fe + (1|Boat.Name), data = .)),
+         anva = map(mod, car::Anova),
+         sumry = map(anva, broom::tidy))%>%
+  select(sumry)%>%
+  unnest()
+
 ```
 
 # Mortality rates of sea snakes in bycatch by gear
@@ -533,6 +569,19 @@ mort.grsp%>%
   group_by(Gear.Type)%>%
   nest()%>%
   mutate(mod = map(data, ~glm(Condition ~ Species, data = ., family = binomial())),
+         sumry = map(mod, broom::tidy),
+         stat = map(mod, ~mcfadden(.)))%>%
+  select(sumry, stat)%>%
+  unnest()
+```
+
+```{r}
+# testing difference in CPUE between Species
+
+mort.grsp%>%
+  group_by(Gear.Type)%>%
+  nest()%>%
+  mutate(mod = map(data, ~glm(Condition ~ fe, data = ., family = binomial())),
          sumry = map(mod, broom::tidy),
          stat = map(mod, ~mcfadden(.)))%>%
   select(sumry, stat)%>%

@@ -3,14 +3,10 @@ title: "Fisheries induced shifts in sea snake assemblages along the Konkan coast
 subtitle: "Supplementary materials B: Analysis and Figures"
 author: "Rao, C., Dsouza, S., Gupta, T., Manoharakrishnan, M. and Lobo, A.S."
 output:
-  html_document:
+  rmdformats::robobook:
     code_folding: hide
     css: style.css
     df_print: kable
-    number_sections: yes
-    theme: united
-    toc: yes
-    toc_float: yes
 ---
 
 ```{r setup, message = F}

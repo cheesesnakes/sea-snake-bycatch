@@ -23,7 +23,7 @@ The impacts of fisheries on several charismatic marine fauna have been a subject
   ```
   *OR*
   
-  Open the `Bycatch MS_analysis.html` file in chrome.
+  Go to https://cheesesnakes.github.io/sea-snake-bycatch/
   
   </details>
  

@@ -149,6 +149,13 @@
       "Repository": "CRAN",
       "Hash": "0b118d5900596bae6c4d4865374536a6"
     },
+    "bookdown": {
+      "Package": "bookdown",
+      "Version": "0.22",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "8fb0b67dfdf9d751fc93cb0036def3cc"
+    },
     "boot": {
       "Package": "boot",
       "Version": "1.3-24",
@@ -965,6 +972,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "f518ba47713f92d0d603eec7c6888faf"
+    },
+    "rmdformats": {
+      "Package": "rmdformats",
+      "Version": "1.0.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "5d278f6266f796c4bd0c3e8439d7f50d"
     },
     "rprojroot": {
       "Package": "rprojroot",

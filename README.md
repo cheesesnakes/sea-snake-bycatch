@@ -2,13 +2,19 @@
 
 Authors: Chetan Rao, Shawn Dsouza, Trisha Gupta, Muralidharan M., and Aaron Savio Lobo
 
-This repo contains the code for analysis in R and data used in the manuscript.
+This repo contains the code for analysis in R and data used in the paper.
 
 [![DOI](https://zenodo.org/badge/265841018.svg)](https://zenodo.org/badge/latestdoi/265841018)
 
 ## Abstract
 
 The impacts of fisheries on several charismatic marine fauna have been a subject of global concern. Sea snakes share the same habitats as many commercially important fish species and often end up as fisheries bycatch. Previous studies of bycatch from India have been limited to reports of mortality without a focus on the regional community structure of sea snakes. This study was carried out from 2016 to 2018 to determine trends in the bycatch of sea snakes in coastal fisheries along the Konkan coast region situated off the central west coast of India. 922 sea snakes were encountered in 916.57 gillnet haul hours and 449.16 trawlers haul hours of fishing, comprising largely of two species; beaked sea snake (*Hydrophis schistosus*) and short sea snake (*Hydrophis curtus*) (83.05% and 16.94%) respectively which were in stark contrast to a study conducted in 2002-03, which recorded a dominance of *H. curtus* (84%) followed by *H. schistosus* (14%) in the same region. However, both studies indicated a higher mortality in *H. curtus* than *H. schistosus*, in trawl nets. This study provides empirical evidence that non-selective fishing practices can have significant effects on assemblages of non-commercial marine vertebrates and hence consequences on the local ecosystem.
+
+## Citation
+
+
+Rao, C., Dsouza, S., Gupta, T., Manoharakrishnan, M. & Lobo, A.S. (2021). Fisheries induced shift in sea snake community assemblages along the Konkan coast, India. Aquatic Conservation: Marine and Freshwater Ecosystems, 1– 10. https://doi.org/10.1002/aqc.3658
+
 
 ## Usage
 
